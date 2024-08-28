@@ -3,6 +3,8 @@ services:
   server:
     container_name: server
     image: server:latest
+    volumes:
+      - ./config/server/config.ini:/app/config.ini
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
@@ -13,6 +15,8 @@ services:
   client1:
     container_name: client1
     image: client:latest
+    volumes:
+      - ./config/client/config.yaml:/app/config.yaml
     entrypoint: /client
     environment:
       - CLI_ID=1
