@@ -9,7 +9,7 @@ services:
     container_name: server
     image: server:latest
     volumes:
-      - ./config/server/config.ini:/app/config.ini
+      - ./server/config.ini:/config.ini
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
@@ -27,7 +27,7 @@ services:
     container_name: client{i}
     image: client:latest
     volumes:
-      - ./config/client/config.yaml:/app/config.yaml
+      - ./client/config.yaml:/config.yaml
     entrypoint: /client
     environment:
       - CLI_ID={i}
