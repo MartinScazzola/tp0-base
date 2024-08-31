@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 	"os"
-
+	"strconv"
 	"github.com/op/go-logging"
 )
 
@@ -104,4 +104,59 @@ func (c *Client) CleanUp() {
 		c.conn.Close()
 		log.Infof("Client connection closed")
 	}
+}
+
+func (c *Client) SendBet() error {
+
+
+	document, err := strconv.ParseUint(os.Getenv("DOCUMENTO"), 10, 32)
+	if err != nil {
+		return fmt.Errorf("error al convertir DOCUMENTO a uint32: %v", err)
+	}
+
+	number, err := strconv.ParseUint(os.Getenv("NUMERO"), 10, 32)
+	if err != nil {
+		return fmt.Errorf("error al convertir NUMERO a uint32: %v", err)
+	}
+
+	agency, err := strconv.ParseUint(os.Getenv("CLI_ID"), 10, 8)
+	if err != nil {
+		return fmt.Errorf("error al convertir NUMERO a uint32: %v", err)
+	}
+
+	bet := Bet{
+		Agency:    uint8(agency),
+		FirstName:    os.Getenv("NOMBRE"),
+		LastName:  os.Getenv("APELLIDO"),
+		Document:       uint32(document),
+		Birthdate: os.Getenv("NACIMIENTO"),
+		Number:    uint32(number),
+	}
+
+	if bet.FirstName == "" || bet.LastName == "" || bet.Birthdate == "" || bet.Number == 0 || bet.Document == 0 || bet.Agency == 0 {
+		return fmt.Errorf("One or more mandatory fields are missing for sending the bet")
+	}
+
+	if err := c.createClientSocket(); err != nil {
+		return fmt.Errorf("Failed to connect to the server: %v", err)
+	}
+
+	betBytes := bet.toBytes()
+
+	_, err = c.conn.Write(betBytes)
+	if err != nil {
+		return fmt.Errorf("failed to send the bet: %v", err)
+	}
+
+	_, err = bufio.NewReader(c.conn).ReadString('\n')
+
+	if err != nil {
+		return fmt.Errorf("failed to receive the server response: %v", err)
+	}
+	
+	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
+
+	c.CleanUp()
+
+	return nil
 }

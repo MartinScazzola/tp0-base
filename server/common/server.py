@@ -3,6 +3,7 @@ import socket
 import logging
 import sys
 
+from common.utils import Bet, store_bets
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -40,7 +41,15 @@ class Server:
 
         try:
             # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
+            msg = client_sock.recv(1024).rstrip()
+
+            len = int.from_bytes(msg[0:2], byteorder='big')
+            bet = Bet.fromBytes(msg[2:len + 2])
+
+            store_bets([bet])
+            
+            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: ${bet.number}')
+
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
             # TODO: Modify the send to avoid short-writes
