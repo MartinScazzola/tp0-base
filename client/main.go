@@ -117,6 +117,5 @@ func main() {
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, syscall.SIGTERM)
 
-	//client.StartClientLoop(stopChan)
-	client.SendBet()
+	client.StartClientLoop(stopChan)
 }

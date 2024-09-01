@@ -4,6 +4,7 @@ import logging
 import sys
 
 from common.utils import Bet, store_bets
+from common.bet import readBetFromBytes, confirmBet
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -40,20 +41,15 @@ class Server:
         self.client_sockets.append(client_sock)
 
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip()
 
-            len = int.from_bytes(msg[0:2], byteorder='big')
-            bet = Bet.fromBytes(msg[2:len + 2])
+            bet = readBetFromBytes(client_sock)
 
             store_bets([bet])
             
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: ${bet.number}')
 
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            confirmBet(client_sock)
+            
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:

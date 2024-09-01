@@ -24,44 +24,6 @@ class Bet:
         self.birthdate = datetime.date.fromisoformat(birthdate)
         self.number = int(number)
 
-    @classmethod
-    def fromBytes(self, data):
-        """Deserializes a byte array to a Bet object."""
-        index = 0
-
-        agency = int.from_bytes(data[index:index + 1], byteorder='big')
-        index += 1
-
-        first_name_length = data[index]
-        index += 1
-        first_name = data[index:index + first_name_length].decode('utf-8')
-        index += first_name_length
-        
-        last_name_length = data[index]
-        index += 1
-        last_name = data[index:index + last_name_length].decode('utf-8')
-        index += last_name_length
-
-        dni = int.from_bytes(data[index:index + 4], byteorder='big')
-        index += 4
-
-        year = int.from_bytes(data[index:index + 2], byteorder='big')
-        index += 2
-        month = int.from_bytes(data[index:index + 1], byteorder='big')
-        index += 1
-        day = int.from_bytes(data[index:index + 1], byteorder='big')
-        index += 1
-
-        birth_date = f"{year}-{month:02d}-{day:02d}"
-
-        number = int.from_bytes(data[index:index + 4], byteorder='big')
-        
-        return self(agency,first_name, last_name, str(dni), birth_date, str(number))
-    
-    def __repr__(self):
-        return (f"Bet(nombre={self.first_name}, apellido={self.last_name}, dni={self.document}, "
-                f"nacimiento={self.birthdate}, numero={self.number})")
-
 """ Checks whether a bet won the prize or not. """
 def has_won(bet: Bet) -> bool:
     return bet.number == LOTTERY_WINNER_NUMBER

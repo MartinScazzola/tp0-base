@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"time"
@@ -52,63 +51,7 @@ func (c *Client) createClientSocket() error {
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop(stopChan chan os.Signal) {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++{
-
-		select {
-		case <-stopChan:
-			log.Infof("action: loop_stopped | result: success | client_id: %v", c.config.ID)
-			c.conn.Close()
-			os.Exit(0)
-
-		default:
-
-			// Create the connection the server in every loop iteration. Send an
-			c.createClientSocket()
-
-			// TODO: Modify the send to avoid short-write
-			fmt.Fprintf(
-				c.conn,
-				"[CLIENT %v] Message N°%v\n",
-				c.config.ID,
-				msgID,
-			)
-			msg, err := bufio.NewReader(c.conn).ReadString('\n')
-			c.conn.Close()
-
-			if err != nil {
-				log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-
-			log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-				c.config.ID,
-				msg,
-			)
-
-			// Wait a time between sending one message and the next one
-			time.Sleep(c.config.LoopPeriod)
-		}
-
-	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-}
-
-func (c *Client) CleanUp() {
-	if c.conn != nil {
-		c.conn.Close()
-		log.Infof("Client connection closed")
-	}
-}
-
-func (c *Client) SendBet() error {
-
-
+func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 	document, err := strconv.ParseUint(os.Getenv("DOCUMENTO"), 10, 32)
 	if err != nil {
 		return fmt.Errorf("error al convertir DOCUMENTO a uint32: %v", err)
@@ -141,22 +84,22 @@ func (c *Client) SendBet() error {
 		return fmt.Errorf("Failed to connect to the server: %v", err)
 	}
 
-	betBytes := bet.toBytes()
-
-	_, err = c.conn.Write(betBytes)
-	if err != nil {
-		return fmt.Errorf("failed to send the bet: %v", err)
+	if err = sendBet(bet, c.conn); err != nil {
+		return fmt.Errorf("Failed to send the bet: %v", err)
 	}
 
-	_, err = bufio.NewReader(c.conn).ReadString('\n')
-
-	if err != nil {
-		return fmt.Errorf("failed to receive the server response: %v", err)
+	if err = receiveConfirm(c.conn, bet); err != nil {
+		return fmt.Errorf("Failed to receive the server response: %v", err)
 	}
-	
-	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
 
 	c.CleanUp()
 
 	return nil
+}
+
+func (c *Client) CleanUp() {
+	if c.conn != nil {
+		c.conn.Close()
+		log.Infof("Client connection closed")
+	}
 }
