@@ -28,15 +28,11 @@ services:
     image: client:latest
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data/agency-{i}.csv:/agency.csv
     entrypoint: /client
     environment:
       - CLI_ID={i}
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=JUAN
-      - APELLIDO=PEREZ
-      - DOCUMENTO=12345678
-      - NACIMIENTO=1990-01-01
-      - NUMERO=1234
     networks:
       - testing_net
     depends_on:

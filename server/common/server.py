@@ -4,7 +4,7 @@ import logging
 import sys
 
 from common.utils import Bet, store_bets
-from common.bet import readBetFromBytes, confirmBet
+from common.bet import recvBets
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -42,13 +42,11 @@ class Server:
 
         try:
 
-            bet = readBetFromBytes(client_sock)
+            bets = recvBets(client_sock)
 
-            store_bets([bet])
-            
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: ${bet.number}')
+            store_bets(bets)
 
-            confirmBet(client_sock)
+            logging.info(f"action: apuestas_almacenadas | result: success | {len(bets)}")
             
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")

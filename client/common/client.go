@@ -1,12 +1,14 @@
 package common
 
 import (
-	"fmt"
 	"net"
 	"time"
 	"os"
-	"strconv"
 	"github.com/op/go-logging"
+	"encoding/csv"
+	"fmt"
+	"io"
+	"strconv"
 )
 
 var log = logging.MustGetLogger("log")
@@ -17,6 +19,8 @@ type ClientConfig struct {
 	ServerAddress string
 	LoopAmount    int
 	LoopPeriod    time.Duration
+	BetsFile	  string
+	BatchSize 	  int
 }
 
 // Client Entity that encapsulates how
@@ -50,46 +54,76 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
+func (c *Client) getBetsFromFile() ([]Bet, error) {
+
+	id, err := strconv.ParseUint(c.config.ID, 10, 8)
+	if err != nil {
+		return nil, fmt.Errorf("Could not parse client ID: %s", err)
+	}
+	
+	
+	fmt.Printf("Getting bets from file: %s\n", c.config.BetsFile)
+
+	file, err := os.Open(c.config.BetsFile)
+	if err != nil {
+		log.Fatalf("Could not open file %s: %s", c.config.BetsFile, err)
+	}
+	defer file.Close()
+	fmt.Println("File opened successfully")
+
+	reader := csv.NewReader(file)
+
+	var data []Bet
+
+	for {
+		line, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("End of file reached")
+				break
+			}
+			log.Fatalf("Error reading line: %s", err)
+		}
+
+		if len(line) == 0 {
+			fmt.Println("Encountered an empty line.")
+			continue
+		}
+
+		document, err := strconv.ParseUint(line[2], 10, 32)
+
+		if err != nil {
+			return nil, fmt.Errorf("Could not parse document number: %s", err)
+		}
+		
+		number, err := strconv.ParseUint(line[4], 10, 32)
+
+		if err != nil {
+			return nil, fmt.Errorf("Could not parse number: %s", err)
+		}
+
+		bet := Bet{uint8(id),line[0], line[1], uint32(document), line[3], uint32(number)}
+
+		data = append(data, bet)
+	}
+
+	return data, nil
+}
+
+
 func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
-	document, err := strconv.ParseUint(os.Getenv("DOCUMENTO"), 10, 32)
+	c.createClientSocket()
+
+	bets, err := c.getBetsFromFile()
+
 	if err != nil {
-		return fmt.Errorf("error al convertir DOCUMENTO a uint32: %v", err)
+		return err
 	}
 
-	number, err := strconv.ParseUint(os.Getenv("NUMERO"), 10, 32)
+	err = sendBetsBatchs(c.conn, bets, c.config.BatchSize)
+
 	if err != nil {
-		return fmt.Errorf("error al convertir NUMERO a uint32: %v", err)
-	}
-
-	agency, err := strconv.ParseUint(os.Getenv("CLI_ID"), 10, 8)
-	if err != nil {
-		return fmt.Errorf("error al convertir NUMERO a uint32: %v", err)
-	}
-
-	bet := Bet{
-		Agency:    uint8(agency),
-		FirstName:    os.Getenv("NOMBRE"),
-		LastName:  os.Getenv("APELLIDO"),
-		Document:       uint32(document),
-		Birthdate: os.Getenv("NACIMIENTO"),
-		Number:    uint32(number),
-	}
-
-	if bet.FirstName == "" || bet.LastName == "" || bet.Birthdate == "" || bet.Number == 0 || bet.Document == 0 || bet.Agency == 0 {
-		return fmt.Errorf("One or more mandatory fields are missing for sending the bet")
-	}
-
-	if err := c.createClientSocket(); err != nil {
-		return fmt.Errorf("Failed to connect to the server: %v", err)
-	}
-
-	if err = sendBet(bet, c.conn); err != nil {
-		return fmt.Errorf("Failed to send the bet: %v", err)
-	}
-
-	if err = receiveConfirm(c.conn, bet); err != nil {
-		return fmt.Errorf("Failed to receive the server response: %v", err)
+		return err
 	}
 
 	c.CleanUp()

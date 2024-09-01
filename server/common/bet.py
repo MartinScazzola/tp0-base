@@ -5,15 +5,8 @@ import logging
 from common.utils import Bet
 
 
-def readBetFromBytes(client_sock):
+def betFromBytes(data):
     """Deserializes a byte array to a Bet object."""
-
-    len = int.from_bytes(client_sock.recv(2), byteorder='big')
-    data = client_sock.recv(len)
-
-    addr = client_sock.getpeername()
-
-    logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {data}')
 
     index = 0
 
@@ -46,5 +39,45 @@ def readBetFromBytes(client_sock):
     
     return Bet(agency,first_name, last_name, str(dni), birth_date, str(number))
 
-def confirmBet(client_sock):
+def confirmBatch(client_sock):
     client_sock.send("{}\n".format("OK").encode('utf-8'))
+
+def parseBatchToBets(batchBytes):
+    index = 0
+    bets = []
+
+    while index < len(batchBytes):
+        betBytesLen = int.from_bytes(batchBytes[index: index + 2], byteorder='big')
+        
+        index += 2
+
+        bet = betFromBytes(batchBytes[index:index + betBytesLen])
+        bets.append(bet)
+
+        index += betBytesLen
+    return bets
+
+
+def recvBets(client_sock):
+    totalBets = []
+
+    while True:
+
+        batchSize = int.from_bytes(client_sock.recv(2), byteorder='big')
+
+        print("batchSize", batchSize)
+
+        if batchSize == 0:
+            break
+
+        batchBytes = client_sock.recv(batchSize)
+
+        bets = parseBatchToBets(batchBytes)
+
+        totalBets.extend(bets)
+
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
+
+        confirmBatch(client_sock)
+
+    return totalBets
