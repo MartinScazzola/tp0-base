@@ -9,12 +9,12 @@ import (
 )
 
 type Bet struct {
-	Agency     uint8 // 1 byte fijo  (0-255)
-	FirstName string // 1 byte de longitud + n bytes de contenido (1 + (0-255))
-	LastName  string // 1 byte de longitud + n bytes de contenido (1 + (0-255))
-	Document   uint32 // 4 bytes fijos (0-4294967295)
-	Birthdate  string // 2 bytes de año + 1 byte de mes + 1 byte de día  (0-65536) anio (0-255) mes (0-255) dia 
-	Number     uint32 // 4 bytes fijos (0-4294967295)
+	Agency     uint8 
+	FirstName string 
+	LastName  string 
+	Document   uint32 
+	Birthdate  string 
+	Number     uint32 
 }
 
 func (b *Bet)toBytes()  []byte {
@@ -57,7 +57,14 @@ func endSendBets(conn net.Conn) error {
 }
 
 func receiveConfirm(conn net.Conn) (string, error) {
-	return bufio.NewReader(conn).ReadString('\n')
+	line, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	line = strings.TrimSuffix(line, "\n")
+
+	return line, nil
 }
 
 func batchToBytes(bets []Bet) []byte {
@@ -70,6 +77,19 @@ func batchToBytes(bets []Bet) []byte {
 	return append(data, '|')
 }
 
+func safeWrite(conn net.Conn, bytes []byte) error {
+	totalBytesWritten := 0
+	for totalBytesWritten < len(bytes) {
+		bytesWritten, err := conn.Write(bytes[totalBytesWritten:])
+		if err != nil {
+			return fmt.Errorf("Error sending the batch: %v", err)
+		}
+
+		totalBytesWritten += bytesWritten
+	}
+	return nil
+}
+
 
 func sendBetsBatch(conn net.Conn, bets []Bet) error {
 	batchBytes := batchToBytes(bets)
@@ -78,17 +98,10 @@ func sendBetsBatch(conn net.Conn, bets []Bet) error {
 		return fmt.Errorf("Batch too long; exceeds 8 kB\n")
 	}
 
-	// TODO: Corregir short write
-	_, err := conn.Write(batchBytes)
+	err := safeWrite(conn, batchBytes)
 
 	if err != nil {
 		return fmt.Errorf("Error sending the batch: %v", err)
-	}
-
-	status, err := receiveConfirm(conn)
-
-	if err != nil && status != "OK" {
-		return fmt.Errorf("Error receiving confirmation: %v", err)
 	}
 
 	return nil

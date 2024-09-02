@@ -1,7 +1,3 @@
-    
-    
-
-import logging
 from common.utils import Bet
 
 
@@ -39,46 +35,42 @@ def betFromBytes(data):
     
     return Bet(agency,first_name, last_name, str(dni), birth_date, str(number)), index + 4
 
-def confirmBatch(client_sock):
+def sendOkRecvBets(client_sock):
     client_sock.send("{}\n".format("OK").encode('utf-8'))
 
-# def parseBatchToBets(batchBytes):
-#     index = 0
-#     bets = []
+def sendFailRecvBets(client_sock):
+    client_sock.send("{}\n".format("FAIL").encode('utf-8'))
 
-#     while index < len(batchBytes):
-#         betBytesLen = int.from_bytes(batchBytes[index: index + 2], byteorder='big')
-        
-#         index += 2
+def safeRead(client_sock):
+    buffer = b''
 
-#         bet = betFromBytes(batchBytes[index:index + betBytesLen])
-#         bets.append(bet)
+    while not buffer.endswith(b'|'):
+        chunk = client_sock.recv(1024)
+        buffer += chunk
 
-#         index += betBytesLen
-#     return bets
-
-
-def recvBets(client_sock):
-
-    #TODO: Corregir short read
-
-    batchBytes = client_sock.recv(1024)
-
-    while bytes(batchBytes[-1:])!= '|'.encode('utf-8'):
-        batchBytes += client_sock.recv(1024)
-
-    batchBytes = batchBytes[:-1]
-
-    if batchBytes == "END".encode('utf-8'):
+    if not buffer or buffer == b'|':
         return None
-    
+
+    buffer = buffer.rstrip(b'|')
+
+    return buffer
+
+def parseBetsFromBytes(batchBytes):
     i = 0
     bets = []
     while i < len(batchBytes):
         currentBets, index = betFromBytes(batchBytes[i:])
         bets.append(currentBets)
         i += index
+    return bets
 
-    confirmBatch(client_sock)
+def recvBets(client_sock):
+    """Receives a list of bets from a client socket."""
+    batchBytes = safeRead(client_sock)
+
+    if batchBytes == b"END":
+        return None
+
+    bets = parseBetsFromBytes(batchBytes)
 
     return bets

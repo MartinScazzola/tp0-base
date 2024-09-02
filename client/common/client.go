@@ -75,14 +75,12 @@ func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) 
 		line, err := reader.Read()
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("End of file reached")
 				break
 			}
 			return nil, fmt.Errorf("error reading line: %v", err)
 		}
 
 		if len(line) == 0 {
-			fmt.Println("Encountered an empty line.")
 			continue
 		}
 
@@ -144,12 +142,22 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 				log.Infof("No more bets to send")
 				break loop
 			}
-			
+
 			err = sendBetsBatch(c.conn, betsBatch)
 
-			if err == nil {
+			if err != nil {
+				return fmt.Errorf("Error sending bets: %v", err)
+			}
+
+			status, err := receiveConfirm(c.conn)
+
+			if err != nil {
+				return fmt.Errorf("Error receiving confirmation: %v", err)
+			}
+
+			if status == "OK" {
 				log.Infof("action: apuestas_enviadas | result: success ")
-			} else {
+			} else if status == "FAIL" {
 				log.Infof("action: apuestas_enviadas | result: fail")
 			}
 			

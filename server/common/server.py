@@ -3,8 +3,8 @@ import socket
 import logging
 import sys
 
-from common.utils import Bet, store_bets
-from common.bet import recvBets
+from common.utils import store_bets
+from common.bet import sendOkRecvBets, recvBets, sendFailRecvBets
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -45,17 +45,19 @@ class Server:
             try:
                 bets = recvBets(client_sock)
 
-                #print("bets recv", bets)
-
                 if not bets:
                     break
 
                 store_bets(bets)
 
                 logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+                sendOkRecvBets(client_sock)
+
             except OSError as e:
                 logging.info(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
-                  
+                sendFailRecvBets(client_sock)
+
+
         client_sock.close()
         self.client_sockets.remove(client_sock)
 
