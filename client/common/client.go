@@ -145,6 +145,7 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 
 			err = sendBetsBatch(c.conn, betsBatch)
 
+
 			if err != nil {
 				return fmt.Errorf("Error sending bets: %v", err)
 			}
@@ -163,7 +164,7 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 			
 			lastBetSent += c.config.BatchSize
 
-			time.Sleep(c.config.LoopPeriod)
+			//time.Sleep(c.config.LoopPeriod)
 		}
 	}
 

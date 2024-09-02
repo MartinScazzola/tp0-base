@@ -36,17 +36,35 @@ def betFromBytes(data):
     return Bet(agency,first_name, last_name, str(dni), birth_date, str(number)), index + 4
 
 def sendOkRecvBets(client_sock):
-    client_sock.send("{}\n".format("OK").encode('utf-8'))
+    safeWrite(client_sock, b"OK|")
 
 def sendFailRecvBets(client_sock):
-    client_sock.send("{}\n".format("FAIL").encode('utf-8'))
+    safeWrite(client_sock, b"FAIL|")
+
+def safeWrite(client_sock, bytes):
+    totalBytesWritten = 0
+    dataLength = len(bytes)
+
+    while totalBytesWritten < dataLength:
+        try:
+            bytesWritten = client_sock.send(bytes[totalBytesWritten:])
+            if bytesWritten == 0:
+                raise Exception("Connection closed by the client")
+            totalBytesWritten += bytesWritten
+        except Exception as e:
+            raise Exception(f"Error sending the batch: {e}")
+        
+    return totalBytesWritten
 
 def safeRead(client_sock):
     buffer = b''
 
     while not buffer.endswith(b'|'):
         chunk = client_sock.recv(1024)
+        if not chunk:
+            raise Exception("Connection closed by the client")
         buffer += chunk
+
 
     if not buffer or buffer == b'|':
         return None

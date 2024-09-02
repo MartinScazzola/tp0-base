@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"net"
-	"bufio"
+	"bytes"
 )
 
 type Bet struct {
@@ -49,22 +49,13 @@ func (b *Bet)toBytes()  []byte {
 
 func endSendBets(conn net.Conn) error {
 	msg := "END"
-	_ , err := conn.Write(append([]byte(msg), []byte("|")...))
-	if err != nil {
-		return fmt.Errorf("Error sending end message: %v", err)
-	}
-	return nil
+	bytes := append([]byte(msg), []byte("|")...)
+	return safeWrite(conn, bytes)
 }
 
 func receiveConfirm(conn net.Conn) (string, error) {
-	line, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-
-	line = strings.TrimSuffix(line, "\n")
-
-	return line, nil
+	status, err := safeRead(conn)
+	return string(status), err
 }
 
 func batchToBytes(bets []Bet) []byte {
@@ -77,11 +68,36 @@ func batchToBytes(bets []Bet) []byte {
 	return append(data, '|')
 }
 
+func safeRead(conn net.Conn) ([]byte, error) {
+	totalBytesRead := 0
+
+	data := make([]byte, 1024)
+
+	for totalBytesRead < 1024 {
+		bytesRead, err := conn.Read(data[totalBytesRead:])
+
+		if err != nil || bytesRead == 0 {
+			return nil, fmt.Errorf("Error reading from the server: %v", err)
+		}
+
+		totalBytesRead += bytesRead
+
+		if data[totalBytesRead - 1] == byte('|') {
+			break
+		}
+	}
+	
+	data = data[:totalBytesRead]
+
+	return bytes.TrimRight(data, "|"), nil
+}
+
 func safeWrite(conn net.Conn, bytes []byte) error {
 	totalBytesWritten := 0
 	for totalBytesWritten < len(bytes) {
 		bytesWritten, err := conn.Write(bytes[totalBytesWritten:])
-		if err != nil {
+
+		if err != nil || bytesWritten == 0 {
 			return fmt.Errorf("Error sending the batch: %v", err)
 		}
 
