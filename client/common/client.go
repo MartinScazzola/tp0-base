@@ -54,7 +54,7 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) getBetsFromFile() ([]Bet, error) {
+func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) {
 
 	id, err := strconv.ParseUint(c.config.ID, 10, 8)
 	if err != nil {
@@ -75,7 +75,15 @@ func (c *Client) getBetsFromFile() ([]Bet, error) {
 
 	var data []Bet
 
+	i := 0
+
 	for {
+
+		if i < lastBetSent {
+			i++
+			continue
+		}
+
 		line, err := reader.Read()
 		if err != nil {
 			if err == io.EOF {
@@ -105,6 +113,8 @@ func (c *Client) getBetsFromFile() ([]Bet, error) {
 		bet := Bet{uint8(id),line[0], line[1], uint32(document), line[3], uint32(number)}
 
 		data = append(data, bet)
+
+		i++
 	}
 
 	return data, nil
@@ -114,20 +124,40 @@ func (c *Client) getBetsFromFile() ([]Bet, error) {
 func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 	c.createClientSocket()
 
-	bets, err := c.getBetsFromFile()
+	lastBetSent := 0
 
-	if err != nil {
-		return err
+	for {
+		select {
+		case <-stopChan:
+			return nil
+		default:
+			betsBatch, err := c.getBetsFromFile(c.config.BatchSize, lastBetSent)
+
+			if err != nil {
+				return fmt.Errorf("Error getting bets from file: %v", err)
+			}
+
+			if len(betsBatch) == 0 {
+				log.Infof("No more bets to send")
+				break
+			}
+
+			err = sendBetsBatch(c.conn, betsBatch)
+
+			if err == nil {
+				log.Infof("action: apuestas_enviadas | result: success ")
+			} else {
+				log.Infof("action: apuestas_enviadas | result: fail")
+			}
+			
+			lastBetSent += c.config.BatchSize
+
+			time.Sleep(c.config.LoopPeriod)
+		}
 	}
 
-	err = sendBetsBatchs(c.conn, bets, c.config.BatchSize)
-
-	if err != nil {
-		return err
-	}
-
+	endSendBets(c.conn)
 	c.CleanUp()
-
 	return nil
 }
 

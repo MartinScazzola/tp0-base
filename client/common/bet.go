@@ -51,14 +51,20 @@ func (b *Bet)toBytes()  []byte {
 	return data
 }
 
-func receiveConfirm(conn net.Conn, bet Bet) error {
-	msg, err := bufio.NewReader(conn).ReadString('\n')
-
-	if err != nil && msg != "OK" {
-		return fmt.Errorf("failed to receive the server response: %v", err)
+func endSendBets(conn net.Conn) error {
+	msg := "END"
+	bytes := []byte(msg)
+	data := append([]byte{byte(len(bytes))}, bytes...)
+	_ , err := conn.Write(data)
+	if err != nil {
+		return fmt.Errorf("Error sending end message: %v", err)
 	}
-	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
+
 	return nil
+}
+
+func receiveConfirm(conn net.Conn) (string, error) {
+	return bufio.NewReader(conn).ReadString('\n')
 }
 
 func batchToBytes(bets []Bet) []byte {
@@ -72,45 +78,39 @@ func batchToBytes(bets []Bet) []byte {
 }
 
 
-func sendBetsBatchs(conn net.Conn, bets []Bet, batchSize int) error {
-	lastBetSent := 0
+func sendBetsBatch(conn net.Conn, bets []Bet) error {
+	batchBytes := batchToBytes(bets)
 
-	for lastBetSent < len(bets) {
-		if lastBetSent+batchSize > len(bets) {
-			batchSize = len(bets) - lastBetSent
-		}
+	if len(batchBytes) > 8192 {
+		return fmt.Errorf("Batch too long; exceeds 8 kB\n")
+	}
 
-		batchBytes := batchToBytes(bets[lastBetSent : lastBetSent+batchSize])
-
-		fmt.Println("Batch size: ", len(batchBytes))
-		if len(batchBytes) > 8192 {
-			return fmt.Errorf("Batch too long; exceeds 8 kB\n")
-		}
-
-		var sizeBuffer bytes.Buffer
-		if err := binary.Write(&sizeBuffer, binary.BigEndian, uint16(len(batchBytes))); err != nil {
-			return fmt.Errorf("Error converting batch size to bytes: %v", err)
-		}
-
-		_, err := conn.Write(append(sizeBuffer.Bytes(), batchBytes...))
-		if err != nil {
-			return fmt.Errorf("Error sending the batch: %v", err)
-		}
-
-		msg, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("Error reading server response: %v", err)
-		}
+	var sizeBuffer bytes.Buffer
+	if err := binary.Write(&sizeBuffer, binary.BigEndian, uint16(len(batchBytes))); err != nil {
+		return fmt.Errorf("Error converting batch size to bytes: %v", err)
+	}
 
 
-		if strings.TrimSpace(msg) != "OK" {
-			return fmt.Errorf("Batch failed: %s", msg)
-		}
+	msg := "BATCH"
+	msgBytes := []byte(msg)
 
-		log.Infof("action: apuestas_enviadas | result: success | batch_size: %v", batchSize)
+	dataMsg := append([]byte{byte(len(msgBytes))}, msgBytes...)
 
-		lastBetSent += batchSize
+	dataBatch := append(sizeBuffer.Bytes(), batchBytes...)
+
+	fmt
+
+	_, err := conn.Write(append(dataMsg, dataBatch...))
+	if err != nil {
+		return fmt.Errorf("Error sending the batch: %v", err)
+	}
+
+	status, err := receiveConfirm(conn)
+
+	if err != nil && status != "OK" {
+		return fmt.Errorf("Error receiving confirmation: %v", err)
 	}
 
 	return nil
 }
+

@@ -59,25 +59,24 @@ def parseBatchToBets(batchBytes):
 
 
 def recvBets(client_sock):
-    totalBets = []
 
-    while True:
+    lenMsgType = int.from_bytes(client_sock.recv(1), byteorder='big')
 
-        batchSize = int.from_bytes(client_sock.recv(2), byteorder='big')
+    msgType = client_sock.recv(lenMsgType).decode('utf-8')
 
-        print("batchSize", batchSize)
+    if msgType == "END":
+        return msgType, None
 
-        if batchSize == 0:
-            break
+    #msgType == "BATCH"
 
-        batchBytes = client_sock.recv(batchSize)
+    batchSize = int.from_bytes(client_sock.recv(2), byteorder='big')
 
-        bets = parseBatchToBets(batchBytes)
+    print("batchSize", batchSize)
 
-        totalBets.extend(bets)
+    batchBytes = client_sock.recv(batchSize)
 
-        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
+    bets = parseBatchToBets(batchBytes)
 
-        confirmBatch(client_sock)
+    confirmBatch(client_sock)
 
-    return totalBets
+    return bets
