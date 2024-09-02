@@ -39,23 +39,25 @@ class Server:
         """
 
         self.client_sockets.append(client_sock)
+        print("Client connected", client_sock.getpeername())
 
         while True:
             try:
-                msgType, bets = recvBets(client_sock)
+                bets = recvBets(client_sock)
 
-                if msgType == "END":
+                #print("bets recv", bets)
+
+                if not bets:
                     break
 
                 store_bets(bets)
 
                 logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-                
             except OSError as e:
                 logging.info(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
-            finally:
-                client_sock.close()
-                self.client_sockets.remove(client_sock)
+                  
+        client_sock.close()
+        self.client_sockets.remove(client_sock)
 
     def __accept_new_connection(self):
         """

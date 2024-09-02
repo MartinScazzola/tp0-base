@@ -55,42 +55,30 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) {
-
 	id, err := strconv.ParseUint(c.config.ID, 10, 8)
 	if err != nil {
-		return nil, fmt.Errorf("Could not parse client ID: %s", err)
+		return nil, fmt.Errorf("could not parse client ID: %v", err)
 	}
-	
-	
-	fmt.Printf("Getting bets from file: %s\n", c.config.BetsFile)
 
 	file, err := os.Open(c.config.BetsFile)
 	if err != nil {
-		log.Fatalf("Could not open file %s: %s", c.config.BetsFile, err)
+		return nil, fmt.Errorf("could not open file %s: %v", c.config.BetsFile, err)
 	}
 	defer file.Close()
-	fmt.Println("File opened successfully")
 
 	reader := csv.NewReader(file)
 
 	var data []Bet
-
-	i := 0
+	lineNumber := 0
 
 	for {
-
-		if i < lastBetSent {
-			i++
-			continue
-		}
-
 		line, err := reader.Read()
 		if err != nil {
 			if err == io.EOF {
 				fmt.Println("End of file reached")
 				break
 			}
-			log.Fatalf("Error reading line: %s", err)
+			return nil, fmt.Errorf("error reading line: %v", err)
 		}
 
 		if len(line) == 0 {
@@ -98,23 +86,38 @@ func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) 
 			continue
 		}
 
-		document, err := strconv.ParseUint(line[2], 10, 32)
-
-		if err != nil {
-			return nil, fmt.Errorf("Could not parse document number: %s", err)
-		}
-		
-		number, err := strconv.ParseUint(line[4], 10, 32)
-
-		if err != nil {
-			return nil, fmt.Errorf("Could not parse number: %s", err)
+		if lineNumber < lastBetSent {
+			lineNumber++
+			continue
 		}
 
-		bet := Bet{uint8(id),line[0], line[1], uint32(document), line[3], uint32(number)}
+		if len(data) < batchSize {
+			document, err := strconv.ParseUint(line[2], 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse document number: %v", err)
+			}
 
-		data = append(data, bet)
+			number, err := strconv.ParseUint(line[4], 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse number: %v", err)
+			}
 
-		i++
+			bet := Bet{
+				Agency:       uint8(id),
+				FirstName:   line[0],
+				LastName:   line[1],
+				Document: uint32(document),
+				Birthdate:   line[3],
+				Number:   uint32(number),
+			}
+			data = append(data, bet)
+		}
+
+		lineNumber++
+
+		if len(data) >= batchSize {
+			break
+		}
 	}
 
 	return data, nil
@@ -126,7 +129,7 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 
 	lastBetSent := 0
 
-	for {
+	loop: for {
 		select {
 		case <-stopChan:
 			return nil
@@ -139,9 +142,9 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 
 			if len(betsBatch) == 0 {
 				log.Infof("No more bets to send")
-				break
+				break loop
 			}
-
+			
 			err = sendBetsBatch(c.conn, betsBatch)
 
 			if err == nil {

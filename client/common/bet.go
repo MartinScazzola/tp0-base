@@ -6,17 +6,15 @@ import (
 	"strings"
 	"net"
 	"bufio"
-	"bytes"
-	"encoding/binary"
 )
 
 type Bet struct {
-	Agency     uint8
-	FirstName string
-	LastName  string
-	Document   uint32
-	Birthdate  string
-	Number     uint32
+	Agency     uint8 // 1 byte fijo  (0-255)
+	FirstName string // 1 byte de longitud + n bytes de contenido (1 + (0-255))
+	LastName  string // 1 byte de longitud + n bytes de contenido (1 + (0-255))
+	Document   uint32 // 4 bytes fijos (0-4294967295)
+	Birthdate  string // 2 bytes de año + 1 byte de mes + 1 byte de día  (0-65536) anio (0-255) mes (0-255) dia 
+	Number     uint32 // 4 bytes fijos (0-4294967295)
 }
 
 func (b *Bet)toBytes()  []byte {
@@ -46,20 +44,15 @@ func (b *Bet)toBytes()  []byte {
 
 	data = append(data, byte(b.Number>>24), byte(b.Number>>16), byte(b.Number>>8), byte(b.Number))
 
-	data = append([]byte{byte(len(data) >> 8), byte(len(data))}, data...)
-
 	return data
 }
 
 func endSendBets(conn net.Conn) error {
 	msg := "END"
-	bytes := []byte(msg)
-	data := append([]byte{byte(len(bytes))}, bytes...)
-	_ , err := conn.Write(data)
+	_ , err := conn.Write(append([]byte(msg), []byte("|")...))
 	if err != nil {
 		return fmt.Errorf("Error sending end message: %v", err)
 	}
-
 	return nil
 }
 
@@ -74,7 +67,7 @@ func batchToBytes(bets []Bet) []byte {
 		data = append(data, bet.toBytes()...)
 	}
 
-	return data
+	return append(data, '|')
 }
 
 
@@ -85,22 +78,9 @@ func sendBetsBatch(conn net.Conn, bets []Bet) error {
 		return fmt.Errorf("Batch too long; exceeds 8 kB\n")
 	}
 
-	var sizeBuffer bytes.Buffer
-	if err := binary.Write(&sizeBuffer, binary.BigEndian, uint16(len(batchBytes))); err != nil {
-		return fmt.Errorf("Error converting batch size to bytes: %v", err)
-	}
+	// TODO: Corregir short write
+	_, err := conn.Write(batchBytes)
 
-
-	msg := "BATCH"
-	msgBytes := []byte(msg)
-
-	dataMsg := append([]byte{byte(len(msgBytes))}, msgBytes...)
-
-	dataBatch := append(sizeBuffer.Bytes(), batchBytes...)
-
-	fmt
-
-	_, err := conn.Write(append(dataMsg, dataBatch...))
 	if err != nil {
 		return fmt.Errorf("Error sending the batch: %v", err)
 	}
