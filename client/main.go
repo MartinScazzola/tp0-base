@@ -121,5 +121,13 @@ func main() {
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, syscall.SIGTERM)
 
-	client.StartClientLoop(stopChan)
+	err = client.StartClientSendBetsLoop(stopChan)
+	if err != nil {
+		log.Criticalf("Error starting ClientSendBetsLoop: %v", err)
+	}
+
+	err = client.StartClientAskForWinnersLoop(stopChan)
+	if err != nil {
+		log.Criticalf("Error starting ClientAskForWinnersLoop: %v", err)
+	}
 }

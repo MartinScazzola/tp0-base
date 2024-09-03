@@ -52,3 +52,8 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
+def getWinnersForAgency(agency: int) -> list[Bet]:
+    bets = load_bets()
+    winners = [bet.document for bet in bets if has_won(bet) and bet.agency == agency]
+    return winners
+

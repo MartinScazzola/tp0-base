@@ -41,6 +41,9 @@ def sendOkRecvBets(client_sock):
 def sendFailRecvBets(client_sock):
     safeWrite(client_sock, b"FAIL|")
 
+def sendWaitForWinners(client_sock):
+    safeWrite(client_sock, b"WAIT|")
+
 def safeWrite(client_sock, bytes):
     totalBytesWritten = 0
     dataLength = len(bytes)
@@ -56,20 +59,14 @@ def safeWrite(client_sock, bytes):
         
     return totalBytesWritten
 
-def safeRead(client_sock):
+def safeRead(client_sock, amount):
     buffer = b''
 
-    while not buffer.endswith(b'|'):
-        chunk = client_sock.recv(1024)
+    while len(buffer) < amount and not buffer.endswith(b'|'):
+        chunk = client_sock.recv(amount)
         if not chunk:
             raise Exception("Connection closed by the client")
         buffer += chunk
-
-
-    if not buffer or buffer == b'|':
-        return None
-
-    buffer = buffer.rstrip(b'|')
 
     return buffer
 
@@ -84,7 +81,12 @@ def parseBetsFromBytes(batchBytes):
 
 def recvBets(client_sock):
     """Receives a list of bets from a client socket."""
-    batchBytes = safeRead(client_sock)
+    batchBytes = safeRead(client_sock, 1024)
+
+    while not batchBytes.endswith(b'|'):
+        batchBytes += safeRead(client_sock, 1024)
+    
+    batchBytes = batchBytes[:-1]
 
     if batchBytes == b"END":
         return None
@@ -92,3 +94,27 @@ def recvBets(client_sock):
     bets = parseBetsFromBytes(batchBytes)
 
     return bets
+
+def recvAction(client_sock):
+    """Receives an action from a client socket."""
+    action = safeRead(client_sock, 3)
+
+    if action == b"BET":
+        return "BEGIN SEND BETS", None
+    elif action == b"WIN":
+        idByte = safeRead(client_sock, 1)
+        client_id = int.from_bytes(idByte, byteorder='big')
+        return "GET WINNERS", client_id
+    else:
+        return "UNKNOWN", None
+
+def sendWinners(client_sock, documents):
+    """Sends a list of winners to a client socket."""
+    data = "WINNERS|".encode('utf-8')
+
+    for document in documents:
+        data += int(document).to_bytes(4, byteorder='big')
+
+    data += b'|'
+
+    safeWrite(client_sock, data)

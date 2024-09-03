@@ -3,8 +3,8 @@ import socket
 import logging
 import sys
 
-from common.utils import store_bets
-from common.bet import sendOkRecvBets, recvBets, sendFailRecvBets
+from common.utils import getWinnersForAgency, has_won, load_bets, store_bets
+from common.bet import recvAction, sendOkRecvBets, recvBets, sendFailRecvBets, sendWaitForWinners, sendWinners
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -13,6 +13,7 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self.client_sockets = []
+        self.clientsDoneSendingBets = 0
 
     def run(self):
         """
@@ -28,9 +29,20 @@ class Server:
 
         while True:
             client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
 
-    def __handle_client_connection(self, client_sock):
+            action, client_id = recvAction(client_sock)
+
+            if action == "BEGIN SEND BETS":
+                self.__handle_client_connection_sending_bets(client_sock)
+            elif action == "GET WINNERS":
+                self.__handle_client_connection_asking_for_winners(client_sock, client_id)
+            else:
+                logging.info(f"action: accept_connections | result: fail | ip: {client_sock.getpeername()[0]}")
+                client_sock.close()
+                self.client_sockets.remove(client_sock)
+
+
+    def __handle_client_connection_sending_bets(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
 
@@ -39,7 +51,7 @@ class Server:
         """
 
         self.client_sockets.append(client_sock)
-        print("Client connected", client_sock.getpeername())
+        print("Client connected to send bets", client_sock.getpeername())
 
         while True:
             try:
@@ -57,9 +69,30 @@ class Server:
                 logging.info(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
                 sendFailRecvBets(client_sock)
 
-
+        self.clientsDoneSendingBets += 1
         client_sock.close()
         self.client_sockets.remove(client_sock)
+    
+    def __handle_client_connection_asking_for_winners(self, client_sock, client_id):
+        """
+        Read message from a specific client socket and closes the socket
+
+        If a problem arises in the communication with the client, the
+        client socket will also be closed
+        """
+
+        self.client_sockets.append(client_sock)
+
+        if self.clientsDoneSendingBets < 5:
+            sendWaitForWinners(client_sock)
+        else:
+            winnersDocument = getWinnersForAgency(client_id)
+            logging.info(f"action: sorteo | result: success")
+            sendWinners(client_sock, winnersDocument)
+        
+        client_sock.close()
+        self.client_sockets.remove(client_sock)
+
 
     def __accept_new_connection(self):
         """

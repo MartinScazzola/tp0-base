@@ -48,13 +48,60 @@ func (b *Bet)toBytes()  []byte {
 }
 
 func endSendBets(conn net.Conn) error {
-	msg := "END"
-	bytes := append([]byte(msg), []byte("|")...)
+	bytes := append([]byte(END_SEND_BETS), BATCH_END_CHAR)
 	return safeWrite(conn, bytes)
 }
 
+func beginSendBets(conn net.Conn) error {
+	bytes := append([]byte(BEGIN_SEND_BETS))
+	return safeWrite(conn, bytes)
+}
+
+func askForWinners(conn net.Conn, client_id string) error {
+	id, err := strconv.ParseUint(client_id, 10, 8)
+	if err != nil {
+		return fmt.Errorf("Could not parse client ID: %v", err)
+	}
+
+	bytes := append([]byte(GET_WINNERS), byte(uint8(id)))
+	return safeWrite(conn, bytes)
+}
+
+func parseDocumentList(data []byte) []uint32 {
+	var documents []uint32
+
+	for i := 0; i < len(data); i += 4 {
+		document := uint32(data[i])<<24 | uint32(data[i+1])<<16 | uint32(data[i+2])<<8 | uint32(data[i+3])
+		documents = append(documents, document)
+	}
+
+	return documents
+}
+
+func receiveWinners(conn net.Conn) (string, []uint32, error) {
+	data, err := safeRead(conn)
+
+	if err != nil {
+		return "", nil, fmt.Errorf("Error receiving winners: %v", err)
+	}
+
+	splitedData := bytes.Split(data, []byte{BATCH_END_CHAR})
+
+	if len(splitedData) < 2 {
+		return "", nil, fmt.Errorf("Invalid data received: %v", data)
+	}
+
+	return string(splitedData[0]), parseDocumentList(splitedData[1]), nil
+}
+
 func receiveConfirm(conn net.Conn) (string, error) {
-	status, err := safeRead(conn)
+	data, err := safeRead(conn)
+
+	if err != nil {
+		return "", fmt.Errorf("Error receiving confirmation: %v", err)
+	}
+	status := bytes.TrimRight(data, string(BATCH_END_CHAR))
+
 	return string(status), err
 }
 
@@ -65,15 +112,15 @@ func batchToBytes(bets []Bet) []byte {
 		data = append(data, bet.toBytes()...)
 	}
 
-	return append(data, '|')
+	return append(data, BATCH_END_CHAR)
 }
 
 func safeRead(conn net.Conn) ([]byte, error) {
 	totalBytesRead := 0
 
-	data := make([]byte, 1024)
+	data := make([]byte, READ_BUFFER_SIZE)
 
-	for totalBytesRead < 1024 {
+	for totalBytesRead < READ_BUFFER_SIZE {
 		bytesRead, err := conn.Read(data[totalBytesRead:])
 
 		if err != nil || bytesRead == 0 {
@@ -82,14 +129,14 @@ func safeRead(conn net.Conn) ([]byte, error) {
 
 		totalBytesRead += bytesRead
 
-		if data[totalBytesRead - 1] == byte('|') {
+		if data[totalBytesRead - 1] == byte(BATCH_END_CHAR) {
 			break
 		}
 	}
 	
 	data = data[:totalBytesRead]
 
-	return bytes.TrimRight(data, "|"), nil
+	return data, nil
 }
 
 func safeWrite(conn net.Conn, bytes []byte) error {
@@ -106,11 +153,10 @@ func safeWrite(conn net.Conn, bytes []byte) error {
 	return nil
 }
 
-
 func sendBetsBatch(conn net.Conn, bets []Bet) error {
 	batchBytes := batchToBytes(bets)
 
-	if len(batchBytes) > 8192 {
+	if len(batchBytes) > MAX_BATCH_SIZE {
 		return fmt.Errorf("Batch too long; exceeds 8 kB\n")
 	}
 
