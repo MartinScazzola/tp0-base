@@ -4,6 +4,7 @@ import logging
 import sys
 
 from common.utils import getWinnersForAgency, store_bets
+from multiprocessing import Process
 from common.bet import (
     sendOkRecvBets,
     recvBets,
@@ -13,6 +14,7 @@ from common.bet import (
 )
 
 
+
 class Server:
     def __init__(self, port, listen_backlog):
         """Initializes the server socket and sets up the server configuration."""
@@ -20,7 +22,6 @@ class Server:
         self._server_socket.bind(("", port))
         self._server_socket.listen(listen_backlog)
         self.client_sockets = {}
-        self.clientsDoneSendingBets = 0
 
     def run(self):
         """
@@ -31,20 +32,35 @@ class Server:
         """
         signal.signal(signal.SIGTERM, self.__handle_signal)
 
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection_sending_bets(client_sock)
-            self.__check_if_all_clients_done_and_send_winners()
+        handlers = []
 
-    def __handle_client_connection_sending_bets(self, client_sock):
+        for _ in range(5):
+            client_sock = self.__accept_new_connection()
+            
+            client_id = recvBeginConnection(client_sock)
+
+            self.client_sockets[client_id] = client_sock
+
+            handler = Process(
+                target=self.__handle_client_connection_sending_bets, args=(client_sock, client_id)
+            )
+            handler.start()
+            handlers.append(handler)
+        
+        for handler in handlers:
+            handler.join()
+        
+        self.__send_winners()
+
+        for socket in self.client_sockets.values():
+            socket.close()
+
+    def __handle_client_connection_sending_bets(self, client_sock, client_id):
         """
         Handles receiving bets from a specific client socket.
 
         Manages the reception of bets, stores them, and sends appropriate responses.
         """
-        client_id = recvBeginConnection(client_sock)
-
-        self.client_sockets[client_id] = client_sock
 
         print("Client connected to send bets", client_sock.getpeername())
 
@@ -67,8 +83,6 @@ class Server:
                     f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}"
                 )
                 sendFailRecvBets(client_sock)
-
-        self.clientsDoneSendingBets += 1
 
     def __accept_new_connection(self):
         """
@@ -96,13 +110,12 @@ class Server:
         logging.info("Server socket closed")
         sys.exit(0)
 
-    def __check_if_all_clients_done_and_send_winners(self):
+    def __send_winners(self):
         """
         Checks if all clients have finished sending bets and sends the winners.
 
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
-        if self.clientsDoneSendingBets >= 5:
-            for id, sock in self.client_sockets.items():
-                bets = getWinnersForAgency(id)
-                sendWinners(sock, bets)
+        for id, sock in self.client_sockets.items():
+            bets = getWinnersForAgency(id)
+            sendWinners(sock, bets)
