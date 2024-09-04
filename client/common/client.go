@@ -179,6 +179,7 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 
 func (c *Client) CleanUp() {
 	if c.conn != nil {
+		time.Sleep(5 * time.Second)
 		c.conn.Close()
 		log.Infof("Client connection closed")
 	}
