@@ -126,6 +126,4 @@ func main() {
 	if err != nil {
 		log.Criticalf("ERROR: %v", err)
 	}
-	log.Infof("Client %s finished", clientConfig.ID)
-	os.Exit(0)
 }
