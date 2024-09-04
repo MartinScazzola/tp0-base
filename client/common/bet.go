@@ -49,7 +49,7 @@ func (b *Bet)toBytes()  []byte {
 
 func endSendBets(conn net.Conn) error {
 	msg := "END"
-	bytes := append([]byte(msg), []byte("|")...)
+	bytes := append([]byte(msg), []byte("||")...)
 	return safeWrite(conn, bytes)
 }
 
@@ -65,7 +65,7 @@ func batchToBytes(bets []Bet) []byte {
 		data = append(data, bet.toBytes()...)
 	}
 
-	return append(data, '|')
+	return append(data, '|', '|')
 }
 
 func safeRead(conn net.Conn) ([]byte, error) {
@@ -82,14 +82,16 @@ func safeRead(conn net.Conn) ([]byte, error) {
 
 		totalBytesRead += bytesRead
 
-		if data[totalBytesRead - 1] == byte('|') {
+		if data[totalBytesRead - 1] == byte('|') && data[totalBytesRead - 2] == byte('|') {
 			break
 		}
 	}
+
+	//fmt.Println("Total bytes read: %v", data)
 	
 	data = data[:totalBytesRead]
 
-	return bytes.TrimRight(data, "|"), nil
+	return bytes.TrimRight(data, "||"), nil
 }
 
 func safeWrite(conn net.Conn, bytes []byte) error {

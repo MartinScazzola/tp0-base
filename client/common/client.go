@@ -139,12 +139,10 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 			}
 
 			if len(betsBatch) == 0 {
-				log.Infof("No more bets to send")
 				break loop
 			}
 
 			err = sendBetsBatch(c.conn, betsBatch)
-
 
 			if err != nil {
 				return fmt.Errorf("Error sending bets: %v", err)
@@ -164,12 +162,18 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 			
 			lastBetSent += c.config.BatchSize
 
-			//time.Sleep(c.config.LoopPeriod)
+			time.Sleep(c.config.LoopPeriod)
 		}
 	}
 
-	endSendBets(c.conn)
+	err := endSendBets(c.conn)
+
+	if err != nil {
+		return fmt.Errorf("Error ending send bets: %v", err)
+	}
+
 	c.CleanUp()
+
 	return nil
 }
 

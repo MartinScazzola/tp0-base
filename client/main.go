@@ -121,5 +121,11 @@ func main() {
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, syscall.SIGTERM)
 
-	client.StartClientLoop(stopChan)
+	err = client.StartClientLoop(stopChan)
+
+	if err != nil {
+		log.Criticalf("ERROR: %v", err)
+	}
+	log.Infof("Client %s finished", clientConfig.ID)
+	os.Exit(0)
 }

@@ -2,6 +2,7 @@ import signal
 import socket
 import logging
 import sys
+import time
 
 from common.utils import store_bets
 from common.bet import sendOkRecvBets, recvBets, sendFailRecvBets
@@ -56,7 +57,6 @@ class Server:
             except OSError as e:
                 logging.info(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
                 sendFailRecvBets(client_sock)
-
 
         client_sock.close()
         self.client_sockets.remove(client_sock)

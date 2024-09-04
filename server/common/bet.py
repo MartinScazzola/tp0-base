@@ -36,10 +36,10 @@ def betFromBytes(data):
     return Bet(agency,first_name, last_name, str(dni), birth_date, str(number)), index + 4
 
 def sendOkRecvBets(client_sock):
-    safeWrite(client_sock, b"OK|")
+    safeWrite(client_sock, b"OK||")
 
 def sendFailRecvBets(client_sock):
-    safeWrite(client_sock, b"FAIL|")
+    safeWrite(client_sock, b"FAIL||")
 
 def safeWrite(client_sock, bytes):
     totalBytesWritten = 0
@@ -59,17 +59,16 @@ def safeWrite(client_sock, bytes):
 def safeRead(client_sock):
     buffer = b''
 
-    while not buffer.endswith(b'|'):
+    while not buffer.endswith(b'||'):
         chunk = client_sock.recv(1024)
-        if not chunk:
-            raise Exception("Connection closed by the client")
+
         buffer += chunk
 
 
-    if not buffer or buffer == b'|':
+    if not buffer or buffer == b'||':
         return None
 
-    buffer = buffer.rstrip(b'|')
+    buffer = buffer.rstrip(b'||')
 
     return buffer
 
