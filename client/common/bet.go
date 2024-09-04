@@ -47,23 +47,14 @@ func (b *Bet)toBytes()  []byte {
 	return data
 }
 
+func beginSendBets(conn net.Conn, id string) error {
+	id_int, _ := strconv.Atoi(id)
+
+	bytes := append([]byte(BEGIN_SEND_BETS), byte(id_int), BATCH_END_CHAR, BATCH_END_CHAR)
+	return safeWrite(conn, bytes)
+}
 func endSendBets(conn net.Conn) error {
-	bytes := append([]byte(END_SEND_BETS), BATCH_END_CHAR)
-	return safeWrite(conn, bytes)
-}
-
-func beginSendBets(conn net.Conn) error {
-	bytes := append([]byte(BEGIN_SEND_BETS))
-	return safeWrite(conn, bytes)
-}
-
-func askForWinners(conn net.Conn, client_id string) error {
-	id, err := strconv.ParseUint(client_id, 10, 8)
-	if err != nil {
-		return fmt.Errorf("Could not parse client ID: %v", err)
-	}
-
-	bytes := append([]byte(GET_WINNERS), byte(uint8(id)))
+	bytes := append([]byte(END_SEND_BETS), BATCH_END_CHAR, BATCH_END_CHAR)
 	return safeWrite(conn, bytes)
 }
 
@@ -78,20 +69,14 @@ func parseDocumentList(data []byte) []uint32 {
 	return documents
 }
 
-func receiveWinners(conn net.Conn) (string, []uint32, error) {
+func receiveWinners(conn net.Conn) ([]uint32, error) {
 	data, err := safeRead(conn)
 
 	if err != nil {
-		return "", nil, fmt.Errorf("Error receiving winners: %v", err)
+		return nil, fmt.Errorf("Error receiving winners: %v", err)
 	}
 
-	splitedData := bytes.Split(data, []byte{BATCH_END_CHAR})
-
-	if len(splitedData) < 2 {
-		return "", nil, fmt.Errorf("Invalid data received: %v", data)
-	}
-
-	return string(splitedData[0]), parseDocumentList(splitedData[1]), nil
+	return parseDocumentList(bytes.TrimRight(data, "||")), nil
 }
 
 func receiveConfirm(conn net.Conn) (string, error) {
@@ -100,7 +85,7 @@ func receiveConfirm(conn net.Conn) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Error receiving confirmation: %v", err)
 	}
-	status := bytes.TrimRight(data, string(BATCH_END_CHAR))
+	status := bytes.TrimRight(data, "||")
 
 	return string(status), err
 }
@@ -112,7 +97,7 @@ func batchToBytes(bets []Bet) []byte {
 		data = append(data, bet.toBytes()...)
 	}
 
-	return append(data, BATCH_END_CHAR)
+	return append(data, BATCH_END_CHAR, BATCH_END_CHAR)
 }
 
 func safeRead(conn net.Conn) ([]byte, error) {
@@ -129,7 +114,7 @@ func safeRead(conn net.Conn) ([]byte, error) {
 
 		totalBytesRead += bytesRead
 
-		if data[totalBytesRead - 1] == byte(BATCH_END_CHAR) {
+		if data[totalBytesRead - 1] == byte(BATCH_END_CHAR) && data[totalBytesRead - 2] == byte(BATCH_END_CHAR) {
 			break
 		}
 	}

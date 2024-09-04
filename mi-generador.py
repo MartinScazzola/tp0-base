@@ -54,7 +54,7 @@ services:
     with open(fileName, 'w') as file:
         file.write(content)
 
-    print(f"OK")
+    print("OK")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

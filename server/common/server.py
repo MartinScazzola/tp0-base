@@ -3,8 +3,8 @@ import socket
 import logging
 import sys
 
-from common.utils import getWinnersForAgency, has_won, load_bets, store_bets
-from common.bet import recvAction, sendOkRecvBets, recvBets, sendFailRecvBets, sendWaitForWinners, sendWinners
+from common.utils import getWinnersForAgency, store_bets
+from common.bet import sendOkRecvBets, recvBets, sendFailRecvBets, sendWinners, recvBeginConnection
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -12,7 +12,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self.client_sockets = []
+        self.client_sockets = {}
         self.clientsDoneSendingBets = 0
 
     def run(self):
@@ -24,22 +24,15 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
-        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGTERM, self.__handle_signal)
 
 
         while True:
             client_sock = self.__accept_new_connection()
+            self.__handle_client_connection_sending_bets(client_sock)
+            self.__check_if_all_clients_done_and_send_winners()
 
-            action, client_id = recvAction(client_sock)
 
-            if action == "BEGIN SEND BETS":
-                self.__handle_client_connection_sending_bets(client_sock)
-            elif action == "GET WINNERS":
-                self.__handle_client_connection_asking_for_winners(client_sock, client_id)
-            else:
-                logging.info(f"action: accept_connections | result: fail | ip: {client_sock.getpeername()[0]}")
-                client_sock.close()
-                self.client_sockets.remove(client_sock)
 
 
     def __handle_client_connection_sending_bets(self, client_sock):
@@ -50,7 +43,10 @@ class Server:
         client socket will also be closed
         """
 
-        self.client_sockets.append(client_sock)
+        client_id = recvBeginConnection(client_sock)
+
+        self.client_sockets[client_id] = client_sock
+        print("Se me conecto el cliente", client_id)
         print("Client connected to send bets", client_sock.getpeername())
 
         while True:
@@ -70,28 +66,7 @@ class Server:
                 sendFailRecvBets(client_sock)
 
         self.clientsDoneSendingBets += 1
-        client_sock.close()
-        self.client_sockets.remove(client_sock)
-    
-    def __handle_client_connection_asking_for_winners(self, client_sock, client_id):
-        """
-        Read message from a specific client socket and closes the socket
 
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
-
-        self.client_sockets.append(client_sock)
-
-        if self.clientsDoneSendingBets < 5:
-            sendWaitForWinners(client_sock)
-        else:
-            winnersDocument = getWinnersForAgency(client_id)
-            logging.info(f"action: sorteo | result: success")
-            sendWinners(client_sock, winnersDocument)
-        
-        client_sock.close()
-        self.client_sockets.remove(client_sock)
 
 
     def __accept_new_connection(self):
@@ -108,16 +83,21 @@ class Server:
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
     
-    def _handle_signal(self, signum, frame):
+    def __handle_signal(self, signum, frame):
         """
         Handle signals for graceful shutdown.
         """
         logging.info(f"Received signal {signum}. Shutting down server")
 
-        for client_sock in self.client_sockets:
+        for client_sock in self.client_sockets.values():
             client_sock.close()
-            self.client_sockets.remove(client_sock)
 
         self._server_socket.close()
         logging.info('Server socket closed')
         sys.exit(0)
+    
+    def __check_if_all_clients_done_and_send_winners(self):
+        if self.clientsDoneSendingBets >= 5:
+            for id, sock in self.client_sockets.items():
+                bets = getWinnersForAgency(id)
+                sendWinners(sock, bets)

@@ -126,8 +126,8 @@ func main() {
 		log.Criticalf("Error starting ClientSendBetsLoop: %v", err)
 	}
 
-	err = client.StartClientAskForWinnersLoop(stopChan)
-	if err != nil {
-		log.Criticalf("Error starting ClientAskForWinnersLoop: %v", err)
-	}
+	// err = client.StartClientAskForWinnersLoop(stopChan)
+	// if err != nil {
+	// 	log.Criticalf("Error starting ClientAskForWinnersLoop: %v", err)
+	// }
 }

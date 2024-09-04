@@ -57,6 +57,7 @@ func (c *Client) createClientSocket() error {
 
 func (c *Client) CleanUp() {
 	if c.conn != nil {
+		time.Sleep(5 * time.Second)
 		c.conn.Close()
 		log.Infof("Client connection closed")
 	}
@@ -134,14 +135,16 @@ func (c *Client) StartClientSendBetsLoop(stopChan chan os.Signal) error {
 	c.createClientSocket()
 
 	lastBetSent := 0
-
-	beginSendBets(c.conn)
+	beginSendBets(c.conn, c.config.ID)
 
 	loop: for {
 		select {
 		case <-stopChan:
-			return nil
+			log.Infof("action: loop_stopped | result: success | client_id: %v", c.config.ID)
+			c.conn.Close()
+			os.Exit(0)
 		default:
+
 			betsBatch, err := c.getBetsFromFile(c.config.BatchSize, lastBetSent)
 
 			if err != nil {
@@ -177,50 +180,19 @@ func (c *Client) StartClientSendBetsLoop(stopChan chan os.Signal) error {
 		}
 	}
 
-	endSendBets(c.conn)
-	c.CleanUp()
-	return nil
-}
+	err := endSendBets(c.conn)
 
-func (c *Client) StartClientAskForWinnersLoop(stopChan chan os.Signal) error {
-
-	loop: for {
-		select {
-		case <-stopChan:
-			log.Infof("action: loop_stopped | result: success | client_id: %v", c.config.ID)
-			c.CleanUp()
-			os.Exit(0)
-		default:
-			// En este caso el socket se crea adentro del loop para no bloquear al server que es single threaded
-
-			c.createClientSocket()
-
-			err := askForWinners(c.conn, c.config.ID)
-
-			if err != nil {
-				return fmt.Errorf("Error asking for winners: %v", err)
-			}
-
-			status,winners, err := receiveWinners(c.conn)
-
-			if err != nil {
-				return fmt.Errorf("Error receiving confirmation: %v", err)
-			}
-
-
-			if status == WINNERS_RESULT {
-				log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
-				break loop
-			} else if status == WAIT_FOR_WINNERS_RESULT {
-				log.Infof("action: winners_asked | result: fail")
-			} else {
-				return fmt.Errorf("Invalid status received from server: %v", status)
-			}
-
-			c.CleanUp()
-			time.Sleep(c.config.LoopPeriod)
-		}
+	if err != nil {
+		return fmt.Errorf("Error ending send bets: %v", err)
 	}
+
+	winners, err := receiveWinners(c.conn)
+
+	if err != nil {
+		return fmt.Errorf("Error receiving winners: %v", err)
+	}
+
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
 
 	c.CleanUp()
 	return nil
