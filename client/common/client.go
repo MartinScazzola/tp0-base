@@ -1,14 +1,14 @@
 package common
 
 import (
-	"net"
-	"time"
-	"os"
-	"github.com/op/go-logging"
 	"encoding/csv"
 	"fmt"
+	"github.com/op/go-logging"
 	"io"
+	"net"
+	"os"
 	"strconv"
+	"time"
 )
 
 var log = logging.MustGetLogger("log")
@@ -19,8 +19,8 @@ type ClientConfig struct {
 	ServerAddress string
 	LoopAmount    int
 	LoopPeriod    time.Duration
-	BetsFile	  string
-	BatchSize 	  int
+	BetsFile      string
+	BatchSize     int
 }
 
 // Client Entity that encapsulates how
@@ -54,7 +54,6 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-
 func (c *Client) CleanUp() {
 	if c.conn != nil {
 		time.Sleep(5 * time.Second)
@@ -64,11 +63,14 @@ func (c *Client) CleanUp() {
 }
 
 func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) {
-	id, err := strconv.ParseUint(c.config.ID, 10, 8)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse client ID: %v", err)
-	}
+	/*
+	   Retrieves a batch of bets from a file.
 
+	   Opens a CSV file specified in the client's configuration and reads bet data, starting
+	   from the specified position (`lastBetSent`). It reads up to the specified `batchSize`
+	   number of bets and returns them. If an error occurs while opening or reading the file,
+	   the function returns an error.
+	*/
 	file, err := os.Open(c.config.BetsFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not open file %s: %v", c.config.BetsFile, err)
@@ -110,12 +112,11 @@ func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) 
 			}
 
 			bet := Bet{
-				Agency:       uint8(id),
-				FirstName:   line[0],
-				LastName:   line[1],
-				Document: uint32(document),
-				Birthdate:   line[3],
-				Number:   uint32(number),
+				FirstName: line[0],
+				LastName:  line[1],
+				Document:  uint32(document),
+				Birthdate: line[3],
+				Number:    uint32(number),
 			}
 			data = append(data, bet)
 		}
@@ -130,14 +131,22 @@ func (c *Client) getBetsFromFile(batchSize int, lastBetSent int) ([]Bet, error) 
 	return data, nil
 }
 
-
 func (c *Client) StartClientSendBetsLoop(stopChan chan os.Signal) error {
+	/*
+	   Main loop to send bets from a client to a server.
+
+	   Initializes the client socket and starts sending bets in batches read from a file.
+	   The loop continues until all bets are sent or a stop signal is received. Each batch
+	   of bets is sent, and the client waits for a confirmation response before sending the
+	   next batch. If an error occurs during sending or receiving, the function exits with an error.
+	*/
 	c.createClientSocket()
 
 	lastBetSent := 0
 	beginSendBets(c.conn, c.config.ID)
 
-	loop: for {
+loop:
+	for {
 		select {
 		case <-stopChan:
 			log.Infof("action: loop_stopped | result: success | client_id: %v", c.config.ID)
@@ -157,7 +166,6 @@ func (c *Client) StartClientSendBetsLoop(stopChan chan os.Signal) error {
 
 			err = sendBetsBatch(c.conn, betsBatch)
 
-
 			if err != nil {
 				return fmt.Errorf("Error sending bets: %v", err)
 			}
@@ -173,7 +181,7 @@ func (c *Client) StartClientSendBetsLoop(stopChan chan os.Signal) error {
 			} else if status == BATCH_SENT_FAIL {
 				log.Infof("action: apuestas_enviadas | result: fail")
 			}
-			
+
 			lastBetSent += c.config.BatchSize
 
 			time.Sleep(c.config.LoopPeriod)
