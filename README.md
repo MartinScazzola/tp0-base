@@ -82,12 +82,36 @@ echo "Cantidad de clientes: $2"
 python3 mi-generador.py $1 $2
 ```
 
+#### Como probarlo:
 
+Pararse en la raiz del proyecto y ejecutar el siguiente comando con la cantidad de clientes deseada (${CANT})
+
+`./generar-compose.sh docker-compose-dev.yaml ${CANT}`
+
+Luego visualizar que el docker-compose-ver.yaml se haya modificado acuerdo a la cantidad de clientes especificada
 
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
 
+#### Como probarlo:
 
+Buildear las imagenes de docker de los clientes y el servidor
+
+`make docker-image`
+
+Luego ejecutar el siguiente comando para ejecutar los contenedores y visualizar que los logs sean correctos de acuerdo a los parametros de los config (por ejemplo loop amount: 5)
+
+`docker compose -f docker-compose-test.yaml up`
+
+Luego detener los contenedores
+
+`docker compose -f docker-compose-dev.yaml down`
+
+Modificar loop amount 5 por 10, volver a levantar los contenedores
+
+`docker compose -f docker-compose-test.yaml up`
+
+Por ultimo visualizar en los logs que el loop amount sea 10
 
 ### Ejercicio N°3:
 Crear un script de bash `validar-echo-server.sh` que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un EchoServer, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado.
@@ -96,18 +120,44 @@ En caso de que la validación sea exitosa imprimir: `action: test_echo_server | 
 
 El script deberá ubicarse en la raíz del proyecto. Netcat no debe ser instalado en la máquina _host_ y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`). `
 
+#### Como probarlo:
 
+Levantar el servidor
+
+`make docker-compose-up`
+
+Ejecutar el script
+
+`./validar-echo-server.sh`
+
+Validar que se imprima por terminal
+
+`action: test_echo_server | result: success`
 
 ### Ejercicio N°4:
 Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
 
+#### Como probarlo:
 
+Levantar el servidor y los clientes
+
+`make docker-compose-up`
+
+Para ver los logs
+
+`make docker-compose-logs`
+
+Abrir otra terminal y ejecutar los siguientes comandos
+
+`docker kill --signal=SIGTERM server`
+
+`docker kill --signal=SIGTERM client1`
+
+Visualizar en los logs que el cliente y el servidor hayan terminado correctamente con codigo 0
 
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base al código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
-
-
 
 ### Ejercicio N°5:
 Modificar la lógica de negocio tanto de los clientes como del servidor para nuestro nuevo caso de uso.
@@ -116,8 +166,6 @@ Modificar la lógica de negocio tanto de los clientes como del servidor para nue
 Emulará a una _agencia de quiniela_ que participa del proyecto. Existen 5 agencias. Deberán recibir como variables de entorno los campos que representan la apuesta de una persona: nombre, apellido, DNI, nacimiento, numero apostado (en adelante 'número'). Ej.: `NOMBRE=Santiago Lionel`, `APELLIDO=Lorca`, `DOCUMENTO=30904465`, `NACIMIENTO=1999-03-17` y `NUMERO=7574` respectivamente.
 
 Los campos deben enviarse al servidor para dejar registro de la apuesta. Al recibir la confirmación del servidor se debe imprimir por log: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
-
-
 
 #### Servidor
 Emulará a la _central de Lotería Nacional_. Deberá recibir los campos de la cada apuesta desde los clientes y almacenar la información mediante la función `store_bet(...)` para control futuro de ganadores. La función `store_bet(...)` es provista por la cátedra y no podrá ser modificada por el alumno.
@@ -129,6 +177,7 @@ Se deberá implementar un módulo de comunicación entre el cliente y el servido
 * Serialización de los datos.
 * Correcta separación de responsabilidades entre modelo de dominio y capa de comunicación.
 * Correcto empleo de sockets, incluyendo manejo de errores y evitando los fenómenos conocidos como [_short read y short write_](https://cs61.seas.harvard.edu/site/2018/FileDescriptors/).
+
 
 
 
