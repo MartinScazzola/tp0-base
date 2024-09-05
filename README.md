@@ -82,12 +82,36 @@ echo "Cantidad de clientes: $2"
 python3 mi-generador.py $1 $2
 ```
 
+#### Como probarlo:
 
+Pararse en la raiz del proyecto y ejecutar el siguiente comando con la cantidad de clientes deseada (${CANT})
+
+`./generar-compose.sh docker-compose-dev.yaml ${CANT}`
+
+Luego visualizar que el docker-compose-ver.yaml se haya modificado acuerdo a la cantidad de clientes especificada
 
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
 
+#### Como probarlo:
 
+Buildear las imagenes de docker de los clientes y el servidor
+
+`make docker-image`
+
+Luego ejecutar el siguiente comando para ejecutar los contenedores y visualizar que los logs sean correctos de acuerdo a los parametros de los config (por ejemplo loop amount: 5)
+
+`docker compose -f docker-compose-test.yaml up`
+
+Luego detener los contenedores
+
+`docker compose -f docker-compose-dev.yaml down`
+
+Modificar loop amount 5 por 10, volver a levantar los contenedores
+
+`docker compose -f docker-compose-test.yaml up`
+
+Por ultimo visualizar en los logs que el loop amount sea 10
 
 ### Ejercicio N°3:
 Crear un script de bash `validar-echo-server.sh` que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un EchoServer, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado.
@@ -96,18 +120,44 @@ En caso de que la validación sea exitosa imprimir: `action: test_echo_server | 
 
 El script deberá ubicarse en la raíz del proyecto. Netcat no debe ser instalado en la máquina _host_ y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`). `
 
+#### Como probarlo:
 
+Levantar el servidor
+
+`make docker-compose-up`
+
+Ejecutar el script
+
+`./validar-echo-server.sh`
+
+Validar que se imprima por terminal
+
+`action: test_echo_server | result: success`
 
 ### Ejercicio N°4:
 Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
 
+#### Como probarlo:
 
+Levantar el servidor y los clientes
+
+`make docker-compose-up`
+
+Para ver los logs
+
+`make docker-compose-logs`
+
+Abrir otra terminal y ejecutar los siguientes comandos
+
+`docker kill --signal=SIGTERM server`
+
+`docker kill --signal=SIGTERM client1`
+
+Visualizar en los logs que el cliente y el servidor hayan terminado correctamente con codigo 0
 
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base al código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
-
-
 
 ### Ejercicio N°5:
 Modificar la lógica de negocio tanto de los clientes como del servidor para nuestro nuevo caso de uso.
@@ -116,8 +166,6 @@ Modificar la lógica de negocio tanto de los clientes como del servidor para nue
 Emulará a una _agencia de quiniela_ que participa del proyecto. Existen 5 agencias. Deberán recibir como variables de entorno los campos que representan la apuesta de una persona: nombre, apellido, DNI, nacimiento, numero apostado (en adelante 'número'). Ej.: `NOMBRE=Santiago Lionel`, `APELLIDO=Lorca`, `DOCUMENTO=30904465`, `NACIMIENTO=1999-03-17` y `NUMERO=7574` respectivamente.
 
 Los campos deben enviarse al servidor para dejar registro de la apuesta. Al recibir la confirmación del servidor se debe imprimir por log: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
-
-
 
 #### Servidor
 Emulará a la _central de Lotería Nacional_. Deberá recibir los campos de la cada apuesta desde los clientes y almacenar la información mediante la función `store_bet(...)` para control futuro de ganadores. La función `store_bet(...)` es provista por la cátedra y no podrá ser modificada por el alumno.
@@ -129,6 +177,54 @@ Se deberá implementar un módulo de comunicación entre el cliente y el servido
 * Serialización de los datos.
 * Correcta separación de responsabilidades entre modelo de dominio y capa de comunicación.
 * Correcto empleo de sockets, incluyendo manejo de errores y evitando los fenómenos conocidos como [_short read y short write_](https://cs61.seas.harvard.edu/site/2018/FileDescriptors/).
+
+#### Explicacion del protocolo:
+
+#### Protocolo de Comunicación entre Cliente y Servidor
+
+El sistema implementa un protocolo de comunicación personalizado entre un cliente y un servidor utilizando sockets TCP. A continuación, se describen los pasos y las estructuras de datos involucradas en esta comunicación:
+
+#### 1. Estructura de la Apuesta (Bet)
+
+El objeto `Bet` representa una apuesta y contiene la siguiente información:
+
+- **Agency (uint8)**: Identificador de la agencia.
+- **FirstName (string)**: Nombre.
+- **LastName (string)**: Apellido.
+- **Document (uint32)**: Número de documento.
+- **Birthdate (string)**: Fecha de nacimiento en formato `YYYY-MM-DD`.
+- **Number (uint32)**: Número de apuesta.
+
+#### 2. Proceso de Comunicación
+
+El flujo de comunicación entre el cliente y el servidor se desarrolla de la siguiente manera:
+
+##### Conexión del Cliente al Servidor
+
+El cliente se conecta al servidor a través de un socket TCP, utilizando la dirección y el puerto configurados.
+
+##### Envío de la Apuesta
+
+1. El cliente serializa la apuesta (`Bet`) en una secuencia de bytes y la envía al servidor.
+2. El formato de serialización incluye:
+   - `Agency` como un solo byte. (Maximo 255 agencias)
+   - `FirstName` y `LastName` precedidos por un byte que indica la longitud de cada cadena. (Variables)
+   - `Document` serializado en 4 bytes. (Maximo 4.294.967.296)
+   - `Birthdate` serializada como 2 bytes para el año, 1 byte para el mes y 1 byte para el día. (Maximos: Año 65.536, Mes 256, Dia 256)
+   - `Number` serializado en 4 bytes. (Maximo 4.294.967.296)
+3. Al final del mensaje se añade un delimitador (`'|'`) para indicar el final de la transmisión.
+
+##### Recepción de la Apuesta por el Servidor
+
+1. El servidor acepta la conexión del cliente y lee la secuencia de bytes enviados.
+2. La apuesta se deserializa utilizando los mismos pasos inversos de la serialización.
+3. Si la apuesta es válida, se almacena y se confirma la recepción enviando el mensaje `"OK"` al cliente.
+
+#### 2. Correcto empleo de sockets
+
+Short-read: Para evitarlo se definicio una funcion safeRead que recibe como parametro la cantidad de bytes esperados a leer y en caso de que se lea menos que esa cantidad se entra a un loop hasta terminar de leer o en su defencto que los bytes terminen con el caracter `'|'` que se utiliza para indicar el final de la transmicion.
+
+Short-Write: Para evitarlo se definio una funcion safeWrite que recibe como parametro los bytes a escribir en el socket para asi hacer un loop mientras la cantidad de bytes efectivamente escritos sea menor a la longitud de ese arreglo de bytes asegurandonos escribir la totalidad de los mismos.
 
 
 
@@ -142,7 +238,19 @@ La cantidad máxima de apuestas dentro de cada _batch_ debe ser configurable des
 
 El servidor, por otro lado, deberá responder con éxito solamente si todas las apuestas del _batch_ fueron procesadas correctamente.
 
+### Explicacion del protocolo
 
+#### Envío de Apuestas en Batches
+El cliente lee las apuestas desde un archivo CSV y las envía al servidor en lotes usando la función `sendBetsBatch()`. Cada lote tiene un tamaño configurable (Batch Size) en cantidad de apuestas, definido en la configuración del cliente. Si el tamaño del lote supera los 8 kB, se genera un error y el lote no se envía. Esta lectra de a n apuestas por batch nos asegura nunca tener cargadas de n apuestas en memoria, debido a que se leen n apuestas y se mandan, y asi siguiente con las siguientes n hasta completar el archivo
+
+#### Confirmación de Recepción
+Después de enviar un lote, el cliente espera una confirmación del servidor mediante la función `receiveConfirm()`. El servidor puede responder con los mensajes `OK` o `FAIL`, indicando si el lote se procesó correctamente o hubo un error. El cliente responde `OK` si y solo si todas las apuestas del batch fueron procesadas correctamente
+
+#### Terminación del Envío
+Una vez que se han enviado todas las apuestas, el cliente envía un mensaje de finalización (`END`) al servidor utilizando `endSendBets()`. Esto permite al servidor saber que no se enviarán más datos.
+
+#### Fin de mensaje
+Todos los mensajes incluyendo los batchs son finalizados con la secuencia de bytes "||" 
 
 ### Ejercicio N°7:
 Modificar los clientes para que notifiquen al servidor al finalizar con el envío de todas las apuestas y así proceder con el sorteo.
