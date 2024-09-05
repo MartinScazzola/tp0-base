@@ -77,10 +77,14 @@ class Server:
                 )
                 sendOkRecvBets(client_sock)
 
-            except OSError as e:
+            except Exception as e:
                 logging.info(
                     f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}"
                 )
+
+                if str(e) == "Connection closed by the client":
+                    logging.info(f"Client {client_id} closed connection")
+                    break
                 sendFailRecvBets(client_sock)
 
     def __accept_new_connection(self):
@@ -115,13 +119,6 @@ class Server:
 
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
-        bets = load_bets()
-
-        n = 0
-        for bet in bets:
-            n += 1
-            
-        print(f"Total bets: {n}")
 
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
