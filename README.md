@@ -82,12 +82,36 @@ echo "Cantidad de clientes: $2"
 python3 mi-generador.py $1 $2
 ```
 
+#### Como probarlo:
 
+Pararse en la raiz del proyecto y ejecutar el siguiente comando con la cantidad de clientes deseada (${CANT})
+
+`./generar-compose.sh docker-compose-dev.yaml ${CANT}`
+
+Luego visualizar que el docker-compose-ver.yaml se haya modificado acuerdo a la cantidad de clientes especificada
 
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
 
+#### Como probarlo:
 
+Buildear las imagenes de docker de los clientes y el servidor
+
+`make docker-image`
+
+Luego ejecutar el siguiente comando para ejecutar los contenedores y visualizar que los logs sean correctos de acuerdo a los parametros de los config (por ejemplo loop amount: 5)
+
+`docker compose -f docker-compose-test.yaml up`
+
+Luego detener los contenedores
+
+`docker compose -f docker-compose-dev.yaml down`
+
+Modificar loop amount 5 por 10, volver a levantar los contenedores
+
+`docker compose -f docker-compose-test.yaml up`
+
+Por ultimo visualizar en los logs que el loop amount sea 10
 
 ### Ejercicio N°3:
 Crear un script de bash `validar-echo-server.sh` que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un EchoServer, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado.
@@ -96,7 +120,19 @@ En caso de que la validación sea exitosa imprimir: `action: test_echo_server | 
 
 El script deberá ubicarse en la raíz del proyecto. Netcat no debe ser instalado en la máquina _host_ y no se puede exponer puertos del servidor para realizar la comunicación (hint: `docker network`). `
 
+#### Como probarlo:
 
+Levantar el servidor
+
+`make docker-compose-up`
+
+Ejecutar el script
+
+`./validar-echo-server.sh`
+
+Validar que se imprima por terminal
+
+`action: test_echo_server | result: success`
 
 ### Ejercicio N°4:
 Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
