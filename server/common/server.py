@@ -103,14 +103,6 @@ class Server:
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
 
-        totalBets = load_bets()
-
-        n = 0
-        for bet in totalBets:
-            n+=1
-        print("Total bets: ", n)
-
-
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
             sendWinners(sock, bets)
