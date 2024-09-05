@@ -1,11 +1,11 @@
 import sys
 
 def generateCompose(fileName, clientsNumber):
-    content = f"""name: tp0
+    content = """name: tp0
 services:
 """
 
-    server = """  server:
+    server = f"""  server:
     container_name: server
     image: server:latest
     volumes:
