@@ -5,7 +5,7 @@ def generateCompose(fileName, clientsNumber):
 services:
 """
 
-    server = """  server:
+    server = f"""  server:
     container_name: server
     image: server:latest
     volumes:
@@ -14,6 +14,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
+      - CLIENTS_NUMBER={clientsNumber}
     networks:
       - testing_net
 

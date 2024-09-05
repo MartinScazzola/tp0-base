@@ -16,11 +16,12 @@ from common.bet import (
 
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, clients_number):
         """Initializes the server socket and sets up the server configuration."""
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(("", port))
         self._server_socket.listen(listen_backlog)
+        self.clients_number = clients_number
         self.client_sockets = {}
 
     def run(self):
@@ -34,7 +35,7 @@ class Server:
 
         handlers = []
 
-        for _ in range(5):
+        for _ in range(self.clients_number):
             client_sock = self.__accept_new_connection()
             
             client_id = recvBeginConnection(client_sock)
