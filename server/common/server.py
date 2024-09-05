@@ -36,6 +36,7 @@ class Server:
             self.__handle_client_connection_sending_bets(client_sock)
 
         self.__send_winners()
+        self.__close_client_sockets()
 
     def __handle_client_connection_sending_bets(self, client_sock):
         """
@@ -106,3 +107,14 @@ class Server:
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
             sendWinners(sock, bets)
+    
+    def __close_client_sockets(self):
+        """
+        Closes all client sockets.
+
+        Iterates over all client sockets and closes them.
+        """
+        for sock in self.client_sockets.values():
+            sock.close()
+        self.client_sockets = {}
+        logging.info("All client sockets closed")

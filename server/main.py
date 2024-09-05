@@ -65,6 +65,5 @@ def initialize_log(logging_level):
         datefmt='%Y-%m-%d %H:%M:%S',
     )
 
-
 if __name__ == "__main__":
     main()
