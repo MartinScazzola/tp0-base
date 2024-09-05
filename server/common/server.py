@@ -3,8 +3,8 @@ import socket
 import logging
 import sys
 
-from common.utils import getWinnersForAgency, store_bets
-from multiprocessing import Process
+from common.utils import getWinnersForAgency, load_bets, store_bets
+from multiprocessing import Process, Lock
 from common.bet import (
     sendOkRecvBets,
     recvBets,
@@ -22,6 +22,7 @@ class Server:
         self._server_socket.bind(("", port))
         self._server_socket.listen(listen_backlog)
         self.clients_number = clients_number
+        self.betsFileLock = Lock()
         self.client_sockets = {}
 
     def run(self):
@@ -67,8 +68,9 @@ class Server:
 
                 if not bets:
                     break
-
-                store_bets(bets)
+                
+                with self.betsFileLock:
+                    store_bets(bets)
 
                 logging.info(
                     f"action: apuesta_recibida | result: success | cantidad: {len(bets)}"
@@ -113,6 +115,14 @@ class Server:
 
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
+        bets = load_bets()
+
+        n = 0
+        for bet in bets:
+            n += 1
+            
+        print(f"Total bets: {n}")
+
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
             sendWinners(sock, bets)
