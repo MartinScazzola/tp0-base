@@ -46,14 +46,10 @@ class Server:
             )
             handler.start()
             handlers.append(handler)
-        
-        for handler in handlers:
-            handler.join()
-        
-        self.__send_winners()
 
-        for socket in self.client_sockets.values():
-            socket.close()
+        self.__wait_clients_send_bets(handlers)
+        self.__send_winners()
+        self.__close_client_sockets()
 
     def __handle_client_connection_sending_bets(self, client_sock, client_id):
         """
@@ -119,3 +115,23 @@ class Server:
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
             sendWinners(sock, bets)
+
+    def __wait_clients_send_bets(self, handlers):
+        """
+        Waits for all clients to send their bets.
+
+        Blocks until all clients have sent their bets.
+        """
+        for handler in handlers:
+            handler.join()
+
+    def __close_client_sockets(self):
+        """
+        Closes all client sockets.
+
+        Iterates over all client sockets and closes them.
+        """
+        for sock in self.client_sockets.values():
+            sock.close()
+        self.client_sockets = {}
+        logging.info("All client sockets closed")
