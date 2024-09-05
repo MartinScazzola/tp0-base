@@ -82,7 +82,13 @@ echo "Cantidad de clientes: $2"
 python3 mi-generador.py $1 $2
 ```
 
+#### Como probarlo:
 
+Pararse en la raiz del proyecto y ejecutar el siguiente comando con la cantidad de clientes deseada (${CANT})
+
+`./generar-compose.sh docker-compose-dev.yaml ${CANT}`
+
+Luego visualizar que el docker-compose-ver.yaml se haya modificado acuerdo a la cantidad de clientes especificada
 
 ### Ejercicio N°2:
 Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera un nuevo build de las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida afuera de la imagen (hint: `docker volumes`).
