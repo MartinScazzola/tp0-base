@@ -62,6 +62,9 @@ def safeRead(client_sock):
     while not buffer.endswith(b'||'):
         chunk = client_sock.recv(1024)
 
+        if not chunk:
+            raise Exception("Connection closed by the client")
+
         buffer += chunk
 
 

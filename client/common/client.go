@@ -130,7 +130,9 @@ func (c *Client) StartClientLoop(stopChan chan os.Signal) error {
 	loop: for {
 		select {
 		case <-stopChan:
-			return nil
+			log.Infof("action: loop_stopped | result: success | client_id: %v", c.config.ID)
+			c.conn.Close()
+			os.Exit(0)
 		default:
 			betsBatch, err := c.getBetsFromFile(c.config.BatchSize, lastBetSent)
 

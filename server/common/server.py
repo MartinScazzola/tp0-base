@@ -54,8 +54,14 @@ class Server:
                 logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
                 sendOkRecvBets(client_sock)
 
-            except OSError as e:
+            except Exception as e:
                 logging.info(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
+
+                print("Error:", e)
+
+                if str(e) == "Connection closed by the client":
+                    logging.info(f"Client closed connection")
+                    break
                 sendFailRecvBets(client_sock)
 
         client_sock.close()
