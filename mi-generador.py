@@ -1,7 +1,7 @@
 import sys
 
 def generateCompose(fileName, clientsNumber):
-    content = """name: tp0
+    content = f"""name: tp0
 services:
 """
 
@@ -14,6 +14,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
+      - CLIENTS_NUMBER={clientsNumber}
     networks:
       - testing_net
 

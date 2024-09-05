@@ -3,7 +3,7 @@ import socket
 import logging
 import sys
 
-from common.utils import getWinnersForAgency, store_bets
+from common.utils import getWinnersForAgency, load_bets, store_bets
 from common.bet import (
     sendOkRecvBets,
     recvBets,
@@ -14,13 +14,13 @@ from common.bet import (
 
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, clients_number):
         """Initializes the server socket and sets up the server configuration."""
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(("", port))
         self._server_socket.listen(listen_backlog)
+        self.clients_number = clients_number
         self.client_sockets = {}
-        self.clientsDoneSendingBets = 0
 
     def run(self):
         """
@@ -31,10 +31,11 @@ class Server:
         """
         signal.signal(signal.SIGTERM, self.__handle_signal)
 
-        while True:
+        for _ in range(self.clients_number):
             client_sock = self.__accept_new_connection()
             self.__handle_client_connection_sending_bets(client_sock)
-            self.__check_if_all_clients_done_and_send_winners()
+
+        self.__send_winners()
 
     def __handle_client_connection_sending_bets(self, client_sock):
         """
@@ -68,7 +69,6 @@ class Server:
                 )
                 sendFailRecvBets(client_sock)
 
-        self.clientsDoneSendingBets += 1
 
     def __accept_new_connection(self):
         """
@@ -96,13 +96,21 @@ class Server:
         logging.info("Server socket closed")
         sys.exit(0)
 
-    def __check_if_all_clients_done_and_send_winners(self):
+    def __send_winners(self):
         """
         Checks if all clients have finished sending bets and sends the winners.
 
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
-        if self.clientsDoneSendingBets >= 5:
-            for id, sock in self.client_sockets.items():
-                bets = getWinnersForAgency(id)
-                sendWinners(sock, bets)
+
+        totalBets = load_bets()
+
+        n = 0
+        for bet in totalBets:
+            n+=1
+        print("Total bets: ", n)
+
+
+        for id, sock in self.client_sockets.items():
+            bets = getWinnersForAgency(id)
+            sendWinners(sock, bets)
