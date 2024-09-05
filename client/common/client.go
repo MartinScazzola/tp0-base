@@ -179,7 +179,7 @@ loop:
 			if status == BATCH_SENT_OK {
 				log.Infof("action: apuestas_enviadas | result: success | cantidad: %v", len(betsBatch))
 			} else if status == BATCH_SENT_FAIL {
-				log.Infof("action: apuestas_enviadas | result: fail")
+				log.Infof("action: apuestas_enviadas | result: fail | cantidad: %v", len(betsBatch))
 			}
 
 			lastBetSent += c.config.BatchSize
