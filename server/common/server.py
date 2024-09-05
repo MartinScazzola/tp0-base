@@ -108,6 +108,8 @@ class Server:
 
         Once all clients have sent their bets, winners are retrieved and sent to each client.
         """
+        
+        logging.info("action: sorteo | result: success")
 
         for id, sock in self.client_sockets.items():
             bets = getWinnersForAgency(id)
