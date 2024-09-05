@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"net"
-	"bufio"
 )
 
 type Bet struct {
@@ -44,21 +43,58 @@ func sendBet(b Bet, conn net.Conn)  error {
 
 	data = append(data, byte(b.Number>>24), byte(b.Number>>16), byte(b.Number>>8), byte(b.Number))
 
-	data = append([]byte{byte(len(data) >> 8), byte(len(data))}, data...)
+	err := safeWrite(conn, append(data, byte('|')))
 
-	if _, err := conn.Write(data); err != nil {
-		return err
+	if err != nil {
+		return fmt.Errorf("failed to send the bet: %v", err)
 	}
 
 	return nil
 }
 
 func receiveConfirm(conn net.Conn, bet Bet) error {
-	msg, err := bufio.NewReader(conn).ReadString('\n')
+	data, err := safeRead(conn, 2)
 
-	if err != nil && msg != "OK" {
+	if err != nil {
 		return fmt.Errorf("failed to receive the server response: %v", err)
 	}
-	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
+
+	msg := string(data)
+
+	if msg != "OK" {
+		return fmt.Errorf("failed to receive the server response: %v", err)
+	}
 	return nil
+}
+
+func safeWrite(conn net.Conn, bytes []byte) error {
+	totalBytesWritten := 0
+	for totalBytesWritten < len(bytes) {
+		bytesWritten, err := conn.Write(bytes[totalBytesWritten:])
+
+		if err != nil || bytesWritten == 0 {
+			return fmt.Errorf("Error sending the batch: %v", err)
+		}
+
+		totalBytesWritten += bytesWritten
+	}
+	
+	return nil
+}
+
+func safeRead(conn net.Conn, sizeToRead int) ([]byte, error) {
+	totalBytesRead := 0
+	data := make([]byte, sizeToRead)
+
+	for totalBytesRead < sizeToRead {
+		bytesRead, err := conn.Read(data[totalBytesRead:])
+
+		if err != nil || bytesRead == 0 {
+			return nil, fmt.Errorf("Error reading from the server: %v", err)
+		}
+
+		totalBytesRead += bytesRead
+	}
+
+	return data, nil
 }

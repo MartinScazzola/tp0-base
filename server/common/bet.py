@@ -6,14 +6,15 @@ from common.utils import Bet
 
 
 def readBetFromBytes(client_sock):
+    data = safeRead(client_sock, 1024)
+
+    bet = parseBetFromBytes(data)
+
+    return bet
+
+
+def parseBetFromBytes(data):
     """Deserializes a byte array to a Bet object."""
-
-    len = int.from_bytes(client_sock.recv(2), byteorder='big')
-    data = client_sock.recv(len)
-
-    addr = client_sock.getpeername()
-
-    logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {data}')
 
     index = 0
 
@@ -47,4 +48,32 @@ def readBetFromBytes(client_sock):
     return Bet(agency,first_name, last_name, str(dni), birth_date, str(number))
 
 def confirmBet(client_sock):
-    client_sock.send("{}\n".format("OK").encode('utf-8'))
+    safeWrite(client_sock, b"OK")
+
+def safeRead(client_sock, amount):
+    """Safely reads a specified amount of data from the client socket."""
+    buffer = b""
+
+    while len(buffer) < amount and not buffer.endswith(b'|'):
+        chunk = client_sock.recv(amount)
+        if not chunk:
+            raise Exception("Connection closed by the client")
+        buffer += chunk
+
+    return buffer
+
+def safeWrite(client_sock, bytes):
+    """Safely writes data to the client socket."""
+    totalBytesWritten = 0
+    dataLength = len(bytes)
+
+    while totalBytesWritten < dataLength:
+        try:
+            bytesWritten = client_sock.send(bytes[totalBytesWritten:])
+            if bytesWritten == 0:
+                raise Exception("Connection closed by the client")
+            totalBytesWritten += bytesWritten
+        except Exception as e:
+            raise Exception(f"Error sending the batch: {e}")
+
+    return totalBytesWritten
